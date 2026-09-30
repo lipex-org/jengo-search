@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use CodeIgniter\CLI\CLI;
+use CodeIgniter\Test\Mock\MockInputOutput;
 use Jengo\Search\Commands\SearchCommand;
 use Jengo\Search\Commands\Variants\FlushVariant;
 use Jengo\Search\Commands\Variants\ImportVariant;
@@ -16,10 +17,22 @@ use PHPUnit\Framework\TestCase;
 
 class SearchCommandsAndVariantsTest extends TestCase
 {
+    private MockInputOutput $io;
+
+    public function setUp(): void
+    {
+        parent::setUp();
+
+        $this->io = new MockInputOutput();
+
+        CLI::setInputOutput($this->io);
+    }
     protected function tearDown(): void
     {
         Search::resetFake();
         parent::tearDown();
+
+        CLI::resetInputOutput();
     }
 
     public function testImportVariantMetaAndExecution(): void
@@ -34,22 +47,22 @@ class SearchCommandsAndVariantsTest extends TestCase
         $fake = Search::fake();
 
         // Run with valid model
-        ob_start();
         $variant->run([DummySearchableModel::class]);
-        $out = ob_get_clean();
+        $out = $this->io->getOutput();
+        $this->assertStringContainsString(DummySearchableModel::class, $out);
+        $this->assertStringContainsString('Successfully imported records into search index', $out);
 
         $fake->assertIndexed('dummy_articles', 'a-1');
         $fake->assertIndexed('dummy_articles', 'a-2');
 
         // Run with empty model argument
-        ob_start();
         $variant->run([]);
-        $outEmpty = ob_get_clean();
+        $outEmpty = $this->io->getOutput();
+        $this->assertStringContainsString('Please provide a model class name to import', $outEmpty);
 
-        // Run with invalid non-existent class
-        ob_start();
         $variant->run(['App\\NonExistentClass']);
-        $outNonExistent = ob_get_clean();
+        $nonExistent = $this->io->getOutput();
+        $this->assertStringContainsString('Model class [App\NonExistentClass] not found', $nonExistent);
     }
 
     public function testFlushVariantMetaAndExecution(): void
@@ -62,23 +75,23 @@ class SearchCommandsAndVariantsTest extends TestCase
 
         $fake = Search::fake();
 
-        ob_start();
         $variant->run(['posts']);
-        ob_get_clean();
-
+        $out = $this->io->getOutput();
+        $this->assertStringContainsString('Flushing search index [posts]', $out);
+        $this->assertStringContainsString('flushed successfully', $out);
         $fake->assertFlushed('posts');
 
         // Run by model class
-        ob_start();
         $variant->run([DummySearchableModel::class]);
-        ob_get_clean();
-
+        $outModel = $this->io->getOutput();
+        $this->assertStringContainsString('Flushing search index [dummy_articles]', $outModel);
+        $this->assertStringContainsString('flushed successfully', $outModel);
         $fake->assertFlushed('dummy_articles');
 
         // Run with empty argument
-        ob_start();
         $variant->run([]);
-        ob_get_clean();
+        $outEmpty = $this->io->getOutput();
+        $this->assertStringContainsString('Please provide an index name or model class name to flush', $outEmpty);
     }
 
     public function testSyncSettingsVariantMetaAndExecution(): void
@@ -90,19 +103,20 @@ class SearchCommandsAndVariantsTest extends TestCase
 
         $fake = Search::fake();
 
-        ob_start();
         $variant->run([DummySearchableModel::class]);
-        ob_get_clean();
+        $out = $this->io->getOutput();
+        $this->assertStringContainsString('Syncing index settings for [dummy_articles]', $out);
+        $this->assertStringContainsString('Index settings synced successfully', $out);
 
         // Run with empty argument
-        ob_start();
         $variant->run([]);
-        ob_get_clean();
+        $outEmpty = $this->io->getOutput();
+        $this->assertStringContainsString('Please provide a model class name', $outEmpty);
 
         // Run with non-existent class
-        ob_start();
         $variant->run(['Invalid\\Class']);
-        ob_get_clean();
+        $outNonExistent = $this->io->getOutput();
+        $this->assertStringContainsString('Model class [Invalid\Class] not found', $outNonExistent);
     }
 
     public function testStatusVariantMetaAndExecution(): void
@@ -114,10 +128,11 @@ class SearchCommandsAndVariantsTest extends TestCase
 
         Search::fake();
 
-        ob_start();
         $variant->run([]);
-        $out = ob_get_clean();
-        $this->assertIsString($out);
+        $out = $this->io->getOutput();
+        $this->assertStringContainsString('Checking search driver health', $out);
+        $this->assertStringContainsString('fake', $out);
+        $this->assertStringContainsString('ok', $out);
     }
 
     public function testSearchInstaller(): void
