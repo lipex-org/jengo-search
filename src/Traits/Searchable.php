@@ -66,21 +66,53 @@ trait Searchable
 
     public function makeAllSearchable(int $chunk = 500): void
     {
+        $transformRow = function ($row) {
+            if (is_object($row) && method_exists($row, 'toSearchableArray')) {
+                return $row->toSearchableArray();
+            }
+
+            if (is_array($row)) {
+                if (method_exists($this, 'toSearchableArray')) {
+                    $clone = clone $this;
+                    if (property_exists($clone, 'attributes')) {
+                        $clone->attributes = $row;
+                    }
+                    foreach ($row as $k => $v) {
+                        $clone->{$k} = $v;
+                    }
+                    return $clone->toSearchableArray();
+                }
+                return $row;
+            }
+
+            return (array) $row;
+        };
+
         if (method_exists($this, 'chunk')) {
-            $this->chunk($chunk, function ($results) {
-                $docs = array_map(function ($row) {
-                    return is_object($row) && method_exists($row, 'toSearchableArray') ? $row->toSearchableArray() : (array) $row;
-                }, $results);
-                Search::updateDocuments($this->searchableAs(), $docs, $this->searchableKeyName());
+            $buffer = [];
+            $this->chunk($chunk, function ($rowOrRows) use (&$buffer, $transformRow, $chunk) {
+                // CI4 Model::chunk passes individual rows, whereas custom chunkers may pass array of rows
+                if (is_array($rowOrRows) && !empty($rowOrRows) && (is_array(reset($rowOrRows)) || is_object(reset($rowOrRows)))) {
+                    $docs = array_map($transformRow, $rowOrRows);
+                    Search::updateDocuments($this->searchableAs(), $docs, $this->searchableKeyName());
+                } else {
+                    $buffer[] = $transformRow($rowOrRows);
+                    if (count($buffer) >= $chunk) {
+                        Search::updateDocuments($this->searchableAs(), $buffer, $this->searchableKeyName());
+                        $buffer = [];
+                    }
+                }
             });
+
+            if (!empty($buffer)) {
+                Search::updateDocuments($this->searchableAs(), $buffer, $this->searchableKeyName());
+            }
             return;
         }
 
         if (method_exists($this, 'findAll')) {
             $results = $this->findAll();
-            $docs = array_map(function ($row) {
-                return is_object($row) && method_exists($row, 'toSearchableArray') ? $row->toSearchableArray() : (array) $row;
-            }, $results);
+            $docs = array_map($transformRow, $results);
             Search::updateDocuments($this->searchableAs(), $docs, $this->searchableKeyName());
         }
     }

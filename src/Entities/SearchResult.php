@@ -81,11 +81,18 @@ class SearchResult implements ArrayAccess, JsonSerializable
 
     public function jsonSerialize(): array
     {
-        return $this->document;
+        return $this->toArray();
     }
 
     public function toArray(): array
     {
-        return $this->document;
+        $arr = $this->document;
+        if (!empty($this->highlights)) {
+            $arr['_highlights'] = $this->highlights;
+        }
+        if (!empty($this->metadata)) {
+            $arr['_metadata'] = $this->metadata;
+        }
+        return $arr;
     }
 }
