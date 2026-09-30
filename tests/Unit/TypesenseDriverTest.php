@@ -124,7 +124,32 @@ class TypesenseDriverTest extends TestCase
         $driver = new TypesenseDriver();
         // Collection already exists (200)
         $driver->setHttpClient($this->createMockClient(200, ['name' => 'products']));
-        $this->assertTrue($driver->syncSettings('products', new IndexSettings()));
+        $settings = new IndexSettings(
+            searchableAttributes: ['title', 'description'],
+            filterableAttributes: ['in_stock', 'price'],
+            synonyms: ['phone' => ['smartphone', 'mobile']]
+        );
+        $this->assertTrue($driver->syncSettings('products', $settings));
+    }
+
+    public function testTypesenseSearchWithFilterTranslation(): void
+    {
+        $driver = new TypesenseDriver();
+        $driver->setHttpClient($this->createMockClient(200, [
+            'found'          => 1,
+            'search_time_ms' => 1.2,
+            'hits'           => [
+                ['document' => ['id' => '10', 'title' => 'Sample']],
+            ],
+        ]));
+
+        $results = $driver->search('products', 'sample', [
+            'filter'     => "category = 'Tech' AND in_stock = true AND price >= 100 AND brand IN ['Apple', 'Dell']",
+            'searchable' => ['title', 'description'],
+        ]);
+
+        $this->assertSame(1, $results->total());
+        $this->assertCount(1, $results);
     }
 
     public function testStatusSuccessAndError(): void

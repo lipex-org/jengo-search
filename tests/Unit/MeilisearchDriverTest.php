@@ -118,7 +118,9 @@ class MeilisearchDriverTest extends TestCase
             searchableAttributes: ['title', 'body'],
             filterableAttributes: ['status'],
             sortableAttributes: ['created_at'],
-            rankingRules: ['words', 'typo']
+            rankingRules: ['words', 'typo'],
+            distinctField: 'category_id',
+            synonyms: ['laptop' => ['notebook', 'macbook']]
         );
 
         $driver->setHttpClient($this->createMockClient(202, ['taskUid' => 105]));
