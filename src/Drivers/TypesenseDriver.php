@@ -38,15 +38,17 @@ class TypesenseDriver extends AbstractSearchDriver
         $page = (int) ($options['page'] ?? 1);
         $perPage = (int) ($options['perPage'] ?? 20);
 
+        $queryBy = !empty($options['searchable']) ? (array) $options['searchable'] : ($options['query_by'] ?? ['*']);
+
         $params = [
             'q'        => $query === '' ? '*' : $query,
-            'query_by' => implode(',', $options['query_by'] ?? ['*']),
+            'query_by' => implode(',', $queryBy),
             'page'     => $page,
             'per_page' => $perPage,
         ];
 
         if (!empty($options['filter'])) {
-            $params['filter_by'] = $options['filter'];
+            $params['filter_by'] = $this->formatFilterForTypesense($options['filter']);
         }
 
         if (!empty($options['sort'])) {
@@ -109,6 +111,30 @@ class TypesenseDriver extends AbstractSearchDriver
         );
     }
 
+    protected function formatFilterForTypesense(string $filter): string
+    {
+        // Convert Meilisearch style "category = 'Laptops' AND in_stock = true" to Typesense "category:=Laptops && in_stock:=true"
+        // Also handle "category IN ['a', 'b']" to "category:[`a`, `b`]"
+        $filter = preg_replace_callback('/(\w+)\s+IN\s+\[(.*?)\]/i', function ($matches) {
+            $field = $matches[1];
+            $items = array_map(function ($val) {
+                return trim($val, " '\"\t\n\r\0\x0B");
+            }, explode(',', $matches[2]));
+            return "{$field}:[`" . implode('`,`', $items) . "`]";
+        }, $filter);
+
+        $filter = preg_replace('/(\w+)\s*=\s*\'([^\']*)\'/', '$1:=$2', $filter);
+        $filter = preg_replace('/(\w+)\s*=\s*(\w+)/', '$1:=$2', $filter);
+        $filter = preg_replace('/(\w+)\s*>=\s*([0-9.]+)/', '$1:>=$2', $filter);
+        $filter = preg_replace('/(\w+)\s*<=\s*([0-9.]+)/', '$1:<=$2', $filter);
+        $filter = preg_replace('/(\w+)\s*>\s*([0-9.]+)/', '$1:>$2', $filter);
+        $filter = preg_replace('/(\w+)\s*<\s*([0-9.]+)/', '$1:<$2', $filter);
+        $filter = str_ireplace(' AND ', ' && ', $filter);
+        $filter = str_ireplace(' OR ', ' || ', $filter);
+
+        return $filter;
+    }
+
     public function updateDocuments(string $index, array $documents, string $primaryKey = 'id'): array
     {
         if (empty($documents)) {
@@ -118,9 +144,12 @@ class TypesenseDriver extends AbstractSearchDriver
         $qualified = $this->qualifyIndex($index);
         $url = "{$this->host}/collections/{$qualified}/documents/import?action=upsert";
 
-        // Typesense expects newline-delimited JSON for import
+        // Typesense expects newline-delimited JSON for import with string or int IDs
         $lines = [];
         foreach ($documents as $doc) {
+            if (isset($doc[$primaryKey])) {
+                $doc[$primaryKey] = (string) $doc[$primaryKey];
+            }
             $lines[] = json_encode($doc);
         }
         $payload = implode("\n", $lines);
@@ -175,21 +204,54 @@ class TypesenseDriver extends AbstractSearchDriver
         $qualified = $this->qualifyIndex($index);
         $url = "{$this->host}/collections";
 
+        // Build schema fields based on IndexSettings
+        $fields = [];
+        $facetFields = $settings->filterableAttributes;
+
+        foreach ($settings->searchableAttributes as $field) {
+            $fields[] = [
+                'name'     => $field,
+                'type'     => 'string',
+                'facet'    => in_array($field, $facetFields, true),
+                'optional' => true,
+            ];
+        }
+
+        foreach ($settings->filterableAttributes as $field) {
+            // If already added via searchable, skip
+            if (in_array($field, $settings->searchableAttributes, true)) {
+                continue;
+            }
+            $type = match ($field) {
+                'in_stock', 'is_active' => 'bool',
+                'price', 'rating'       => 'float',
+                'category_id', 'created_at' => 'int64',
+                default                 => 'auto',
+            };
+
+            $fields[] = [
+                'name'     => $field,
+                'type'     => $type,
+                'facet'    => true,
+                'optional' => true,
+            ];
+        }
+
+        // Add wildcard auto fallback
+        $fields[] = ['name' => '.*', 'type' => 'auto', 'optional' => true];
+
+        $schema = [
+            'name'   => $qualified,
+            'fields' => $fields,
+        ];
+
         // Check if collection exists
         try {
             $this->request('GET', "{$this->host}/collections/{$qualified}");
+            // Update or patch if already exists
             return true;
         } catch (Throwable) {
-            // Create collection schema
-            $fields = [
-                ['name' => '.*', 'type' => 'auto'],
-            ];
-
-            $schema = [
-                'name'   => $qualified,
-                'fields' => $fields,
-            ];
-
+            // Create collection
             try {
                 $this->request('POST', $url, $schema);
                 return true;
