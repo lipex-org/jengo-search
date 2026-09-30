@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use Jengo\Search\Drivers\NullDriver;
 use Jengo\Search\Facades\Search;
 use Jengo\Search\Query\SearchQueryBuilder;
-use Jengo\Search\Support\IndexSettings;
-use Jengo\Search\Testing\SearchFake;
 use PHPUnit\Framework\TestCase;
 
 class SearchQueryBuilderAndFakeTest extends TestCase

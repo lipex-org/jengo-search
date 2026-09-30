@@ -29,8 +29,20 @@ abstract class AbstractSearchDriver implements SearchDriverInterface
         return $index;
     }
 
+    protected ?CURLRequest $httpClient = null;
+
+    public function setHttpClient(?CURLRequest $client): self
+    {
+        $this->httpClient = $client;
+        return $this;
+    }
+
     protected function getHttpClient(array $options = []): CURLRequest
     {
+        if ($this->httpClient !== null) {
+            return $this->httpClient;
+        }
+
         return Services::curlrequest($options);
     }
 }

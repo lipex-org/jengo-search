@@ -69,7 +69,7 @@ trait Searchable
         if (method_exists($this, 'chunk')) {
             $this->chunk($chunk, function ($results) {
                 $docs = array_map(function ($row) {
-                    return method_exists($row, 'toSearchableArray') ? $row->toSearchableArray() : (array) $row;
+                    return is_object($row) && method_exists($row, 'toSearchableArray') ? $row->toSearchableArray() : (array) $row;
                 }, $results);
                 Search::updateDocuments($this->searchableAs(), $docs, $this->searchableKeyName());
             });
@@ -79,7 +79,7 @@ trait Searchable
         if (method_exists($this, 'findAll')) {
             $results = $this->findAll();
             $docs = array_map(function ($row) {
-                return method_exists($row, 'toSearchableArray') ? $row->toSearchableArray() : (array) $row;
+                return is_object($row) && method_exists($row, 'toSearchableArray') ? $row->toSearchableArray() : (array) $row;
             }, $results);
             Search::updateDocuments($this->searchableAs(), $docs, $this->searchableKeyName());
         }

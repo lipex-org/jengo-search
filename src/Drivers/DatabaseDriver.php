@@ -19,6 +19,12 @@ class DatabaseDriver extends AbstractSearchDriver
         parent::__construct($config, $prefix);
     }
 
+    public function setDb(?BaseConnection $db): self
+    {
+        $this->db = $db;
+        return $this;
+    }
+
     protected function getDb(): BaseConnection
     {
         if ($this->db === null) {
