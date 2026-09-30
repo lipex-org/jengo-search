@@ -1,0 +1,121 @@
+{
+  "name": "jengo/search",
+  "description": "First-party full-text search engine integration (Meilisearch, Typesense, Database) with zero heavy third-party SDK dependencies for CodeIgniter 4 and the Jengo Framework.",
+  "version": "1.0.0",
+  "facade": {
+    "class": "Jengo\\Search\\Facades\\Search",
+    "description": "Primary static entry point providing fluent search querying, document index management, driver switching, settings syncing, and testing fakes."
+  },
+  "manager": {
+    "class": "Jengo\\Search\\Support\\SearchManager",
+    "service": "service('search')",
+    "description": "Search manager handling driver lifecycle and resolution."
+  },
+  "query_builder": {
+    "class": "Jengo\\Search\\Query\\SearchQueryBuilder",
+    "description": "Fluent search query builder supporting filters, sorting, facets, highlighting, pagination, raw engine responses, and entity mapping."
+  },
+  "drivers": [
+    {
+      "name": "meilisearch",
+      "class": "Jengo\\Search\\Drivers\\MeilisearchDriver",
+      "description": "Meilisearch REST driver with typo tolerance, instant search, dynamic ranking rules, and highlighted attributes."
+    },
+    {
+      "name": "typesense",
+      "class": "Jengo\\Search\\Drivers\\TypesenseDriver",
+      "description": "Typesense REST driver with schema syncing, multi-field searching, NDJSON batch imports, and faceted filtering."
+    },
+    {
+      "name": "database",
+      "class": "Jengo\\Search\\Drivers\\DatabaseDriver",
+      "description": "Zero-dependency full-text database driver utilizing MySQL FULLTEXT MATCH() AGAINST() or LIKE fallback."
+    },
+    {
+      "name": "null",
+      "class": "Jengo\\Search\\Drivers\\NullDriver",
+      "description": "No-op driver for local environments or staging where search is disabled."
+    },
+    {
+      "name": "fake",
+      "class": "Jengo\\Search\\Testing\\SearchFake",
+      "description": "In-memory test double driver for inspecting indexing operations and asserting query execution."
+    }
+  ],
+  "configuration": {
+    "file": "app/Config/Search.php",
+    "env_prefix": "search",
+    "dot_notation_examples": [
+      "search.default = 'meilisearch'",
+      "search.prefix = 'jengo_'",
+      "search.drivers.meilisearch.host = 'http://127.0.0.1:7700'",
+      "search.drivers.meilisearch.apiKey = 'masterKey'",
+      "search.drivers.typesense.nodes.0.host = '127.0.0.1'",
+      "search.drivers.typesense.nodes.0.port = '8108'",
+      "search.drivers.typesense.nodes.0.protocol = 'http'",
+      "search.drivers.typesense.apiKey = 'xyz123'",
+      "search.drivers.database.connection = 'default'"
+    ]
+  },
+  "attributes": [
+    {
+      "class": "Jengo\\Search\\Attributes\\SearchIndex",
+      "target": "CLASS",
+      "description": "Attribute to configure search index name, engine, and primary key on models or entities."
+    }
+  ],
+  "traits": [
+    {
+      "class": "Jengo\\Search\\Traits\\Searchable",
+      "description": "Model trait hooking into CI4 model insert/update/delete events to auto-sync search documents."
+    }
+  ],
+  "testing": {
+    "fake_class": "Jengo\\Search\\Testing\\SearchFake",
+    "activation": "Search::fake(): Jengo\\Search\\Testing\\SearchFake",
+    "trait": "Jengo\\Search\\Testing\\Concerns\\SearchTestAssertionsTrait",
+    "assertions": [
+      "$fake->assertIndexed(string $index, string|int $id, ?callable $callback = null)",
+      "$fake->assertNotIndexed(string $index, string|int $id)",
+      "$fake->assertIndexCount(string $index, int $expectedCount)",
+      "$fake->assertFlushed(string $index)",
+      "$fake->assertNothingIndexed()"
+    ]
+  },
+  "helpers": [
+    {
+      "name": "search",
+      "signature": "search(?string $query = null, ?string $index = null): Jengo\\Search\\Query\\SearchQueryBuilder|Jengo\\Search\\Support\\SearchManager",
+      "description": "Helper function returning a SearchQueryBuilder if query or index is passed, or SearchManager otherwise."
+    }
+  ],
+  "commands": [
+    {
+      "name": "jengo:search import",
+      "variant": "Jengo\\Search\\Commands\\Variants\\ImportVariant",
+      "description": "Batch import model records into search engine."
+    },
+    {
+      "name": "jengo:search flush",
+      "variant": "Jengo\\Search\\Commands\\Variants\\FlushVariant",
+      "description": "Clear all documents from a search index."
+    },
+    {
+      "name": "jengo:search sync-settings",
+      "variant": "Jengo\\Search\\Commands\\Variants\\SyncSettingsVariant",
+      "description": "Sync index filterable/sortable/searchable attributes to search engine."
+    },
+    {
+      "name": "jengo:search status",
+      "variant": "Jengo\\Search\\Commands\\Variants\\StatusVariant",
+      "description": "Check connection status and health of the search engine."
+    }
+  ],
+  "installers": [
+    {
+      "class": "Jengo\\Search\\Installers\\SearchInstaller",
+      "command": "php spark jengo:install search",
+      "description": "Publishes default Search configuration into app/Config/Search.php."
+    }
+  ]
+}

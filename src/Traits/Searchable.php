@@ -1,0 +1,174 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Jengo\Search\Traits;
+
+use Jengo\Search\Attributes\SearchIndex;
+use Jengo\Search\Facades\Search;
+use Jengo\Search\Support\IndexSettings;
+use ReflectionClass;
+
+trait Searchable
+{
+    /**
+     * Get search index name.
+     */
+    public function getSearchIndexName(): string
+    {
+        $reflection = new ReflectionClass(static::class);
+        $attrs = $reflection->getAttributes(SearchIndex::class);
+        if (!empty($attrs)) {
+            $instance = $attrs[0]->newInstance();
+            if (!empty($instance->name)) {
+                return $instance->name;
+            }
+        }
+
+        return $this->inferSearchIndexName();
+    }
+
+    public function searchableAs(): string
+    {
+        return $this->getSearchIndexName();
+    }
+
+    public function searchableKeyName(): string
+    {
+        return static::getSearchIndexSettings()->primaryKey;
+    }
+
+    public function indexSettings(): IndexSettings
+    {
+        return static::getSearchIndexSettings();
+    }
+
+    public function searchable(array|object|null $record = null): void
+    {
+        if ($record !== null) {
+            $docs = is_array($record) && isset($record[0]) && is_array($record[0]) ? $record : [(array) $record];
+            Search::updateDocuments($this->searchableAs(), $docs, $this->searchableKeyName());
+            return;
+        }
+
+        $this->searchIndex();
+    }
+
+    public function unsearchable(array $ids = []): void
+    {
+        if (!empty($ids)) {
+            Search::deleteDocuments($this->searchableAs(), $ids);
+            return;
+        }
+
+        $this->searchUnindex();
+    }
+
+    public function makeAllSearchable(int $chunk = 500): void
+    {
+        if (method_exists($this, 'chunk')) {
+            $this->chunk($chunk, function ($results) {
+                $docs = array_map(function ($row) {
+                    return method_exists($row, 'toSearchableArray') ? $row->toSearchableArray() : (array) $row;
+                }, $results);
+                Search::updateDocuments($this->searchableAs(), $docs, $this->searchableKeyName());
+            });
+            return;
+        }
+
+        if (method_exists($this, 'findAll')) {
+            $results = $this->findAll();
+            $docs = array_map(function ($row) {
+                return method_exists($row, 'toSearchableArray') ? $row->toSearchableArray() : (array) $row;
+            }, $results);
+            Search::updateDocuments($this->searchableAs(), $docs, $this->searchableKeyName());
+        }
+    }
+
+    /**
+     * Get index settings from attribute or defaults.
+     */
+    public static function getSearchIndexSettings(): IndexSettings
+    {
+        $reflection = new ReflectionClass(static::class);
+        $attrs = $reflection->getAttributes(SearchIndex::class);
+
+        if (!empty($attrs)) {
+            /** @var SearchIndex $instance */
+            $instance = $attrs[0]->newInstance();
+            return new IndexSettings(
+                searchableAttributes: $instance->searchableAttributes,
+                filterableAttributes: $instance->filterableAttributes,
+                sortableAttributes: $instance->sortableAttributes,
+                rankingRules: $instance->rankingRules,
+                primaryKey: $instance->primaryKey
+            );
+        }
+
+        return new IndexSettings();
+    }
+
+    /**
+     * Transform the model into a searchable array.
+     */
+    public function toSearchableArray(): array
+    {
+        if (method_exists($this, 'toArray')) {
+            return $this->toArray();
+        }
+
+        return get_object_vars($this);
+    }
+
+    /**
+     * Get the search key (primary ID).
+     */
+    public function getSearchKey(): int|string
+    {
+        if (isset($this->id)) {
+            return $this->id;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Determine if this instance should be indexed.
+     */
+    public function shouldBeSearchable(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Synchronize the current model instance to the search index.
+     */
+    public function searchIndex(): void
+    {
+        if (!$this->shouldBeSearchable()) {
+            return;
+        }
+
+        $index = $this->getSearchIndexName();
+        $payload = $this->toSearchableArray();
+
+        Search::updateDocuments($index, [$payload], static::getSearchIndexSettings()->primaryKey);
+    }
+
+    /**
+     * Remove the current model instance from the search index.
+     */
+    public function searchUnindex(): void
+    {
+        $index = $this->getSearchIndexName();
+        $key = $this->getSearchKey();
+
+        Search::deleteDocuments($index, [$key]);
+    }
+
+    protected function inferSearchIndexName(): string
+    {
+        $base = class_basename(static::class);
+        return strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $base));
+    }
+}
