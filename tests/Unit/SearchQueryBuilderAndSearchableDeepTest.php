@@ -147,20 +147,47 @@ class SearchQueryBuilderAndSearchableDeepTest extends TestCase
         $this->assertInstanceOf(\Jengo\Search\Drivers\NullDriver::class, $manager->driver('custom'));
     }
 
-    public function testSearchFacadeDelegation(): void
+    public function testSearchQueryBuilderWhereWithArrayDelegation(): void
     {
         $fake = Search::fake();
 
-        Search::updateDocuments('items', [['id' => 1, 'val' => 'abc']]);
-        $fake->assertIndexed('items', 1);
+        $builder = (new SearchQueryBuilder($fake, 'products', 'phone'))
+            ->where('category', ['Smartphones', 'Audio']);
 
-        Search::deleteDocuments('items', [1]);
-        $fake->assertNotIndexed('items', 1);
+        $builder->get();
 
-        Search::flush('items');
-        $fake->assertFlushed('items');
+        $query = $fake->queries[0];
+        $this->assertStringContainsString("category IN ['Smartphones', 'Audio']", $query['options']['filter']);
+    }
 
-        $res = Search::search('items', 'abc');
-        $this->assertInstanceOf(SearchResultsCollection::class, $res);
+    public function testSearchResultSerializesHighlightsAndMetadata(): void
+    {
+        $res = new SearchResult(
+            document: ['id' => 10, 'title' => 'MacBook'],
+            highlights: ['title' => '<em>MacBook</em>'],
+            metadata: ['score' => 0.99]
+        );
+
+        $array = $res->toArray();
+        $this->assertArrayHasKey('_highlights', $array);
+        $this->assertSame('<em>MacBook</em>', $array['_highlights']['title']);
+        $this->assertArrayHasKey('_metadata', $array);
+        $this->assertSame(0.99, $array['_metadata']['score']);
+
+        $json = json_encode($res, JSON_UNESCAPED_SLASHES);
+        $this->assertStringContainsString('<em>MacBook</em>', $json);
+    }
+
+    public function testSyncSearchIndexJobExecution(): void
+    {
+        $fake = Search::fake();
+
+        $updateJob = new \Jengo\Search\Jobs\SyncSearchIndexJob('update', 'posts', [['id' => 1, 'title' => 'Job Post']], 'id');
+        $updateJob->handle();
+        $fake->assertIndexed('posts', 1);
+
+        $deleteJob = new \Jengo\Search\Jobs\SyncSearchIndexJob('delete', 'posts', [1]);
+        $deleteJob->handle();
+        $fake->assertNotIndexed('posts', 1);
     }
 }

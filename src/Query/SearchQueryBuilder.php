@@ -51,6 +51,10 @@ class SearchQueryBuilder
             $operator = (string) $operatorOrValue;
         }
 
+        if (is_array($value)) {
+            return $this->whereIn($field, $value);
+        }
+
         $this->wheres[] = [
             'field'    => $field,
             'operator' => $operator,

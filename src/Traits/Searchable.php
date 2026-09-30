@@ -198,6 +198,83 @@ trait Searchable
         Search::deleteDocuments($index, [$key]);
     }
 
+    /**
+     * Initialize automatic search model event hooks.
+     * CodeIgniter 4 Model automatically calls initialize() during __construct().
+     */
+    protected function initialize(): void
+    {
+        if (is_callable('parent::initialize')) {
+            parent::initialize();
+        }
+
+        if (property_exists($this, 'afterInsert') && !in_array('afterInsertSearchable', $this->afterInsert, true)) {
+            $this->afterInsert[] = 'afterInsertSearchable';
+        }
+
+        if (property_exists($this, 'afterUpdate') && !in_array('afterUpdateSearchable', $this->afterUpdate, true)) {
+            $this->afterUpdate[] = 'afterUpdateSearchable';
+        }
+
+        if (property_exists($this, 'afterDelete') && !in_array('afterDeleteSearchable', $this->afterDelete, true)) {
+            $this->afterDelete[] = 'afterDeleteSearchable';
+        }
+    }
+
+    /**
+     * CI4 Model afterInsert callback to sync newly created records.
+     */
+    protected function afterInsertSearchable(array $data): array
+    {
+        if (empty($data['result']) || empty($data['id'])) {
+            return $data;
+        }
+
+        $id = $data['id'];
+        $record = method_exists($this, 'find') ? $this->find($id) : ($data['data'] ?? null);
+
+        if ($record !== null) {
+            $this->searchable($record);
+        }
+
+        return $data;
+    }
+
+    /**
+     * CI4 Model afterUpdate callback to sync updated records.
+     */
+    protected function afterUpdateSearchable(array $data): array
+    {
+        if (empty($data['result']) || empty($data['id'])) {
+            return $data;
+        }
+
+        $ids = is_array($data['id']) ? $data['id'] : [$data['id']];
+        foreach ($ids as $id) {
+            $record = method_exists($this, 'find') ? $this->find($id) : ($data['data'] ?? null);
+            if ($record !== null) {
+                $this->searchable($record);
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * CI4 Model afterDelete callback to remove deleted records from search index.
+     */
+    protected function afterDeleteSearchable(array $data): array
+    {
+        if (empty($data['result']) || empty($data['id'])) {
+            return $data;
+        }
+
+        $ids = is_array($data['id']) ? $data['id'] : [$data['id']];
+        $this->unsearchable($ids);
+
+        return $data;
+    }
+
     protected function inferSearchIndexName(): string
     {
         $base = class_basename(static::class);

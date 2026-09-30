@@ -41,12 +41,12 @@ class Search
 
     public static function updateDocuments(string $index, array $documents, string $primaryKey = 'id'): array
     {
-        return static::driver()->updateDocuments($index, $documents, $primaryKey);
+        return static::getManager()->dispatchUpdate($index, $documents, $primaryKey);
     }
 
     public static function deleteDocuments(string $index, array $ids): array
     {
-        return static::driver()->deleteDocuments($index, $ids);
+        return static::getManager()->dispatchDelete($index, $ids);
     }
 
     public static function flush(string $index): bool

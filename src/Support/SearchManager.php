@@ -78,6 +78,47 @@ class SearchManager
         return $this->config;
     }
 
+    public function shouldQueue(): bool
+    {
+        return (bool) ($this->config->queue ?? false);
+    }
+
+    public function dispatchUpdate(string $index, array $documents, string $primaryKey = 'id'): array
+    {
+        if ($this->shouldQueue() && class_exists('Config\Services') && is_callable(['Config\Services', 'queue'])) {
+            try {
+                $job = new \Jengo\Search\Jobs\SyncSearchIndexJob('update', $index, $documents, $primaryKey);
+                $queueService = \Config\Services::queue();
+                if (is_object($queueService) && method_exists($queueService, 'push')) {
+                    $queueService->push($job);
+                    return ['status' => 'queued', 'count' => count($documents)];
+                }
+            } catch (\Throwable) {
+                // Fallback to synchronous update if queue fails
+            }
+        }
+
+        return $this->driver()->updateDocuments($index, $documents, $primaryKey);
+    }
+
+    public function dispatchDelete(string $index, array $ids): array
+    {
+        if ($this->shouldQueue() && class_exists('Config\Services') && is_callable(['Config\Services', 'queue'])) {
+            try {
+                $job = new \Jengo\Search\Jobs\SyncSearchIndexJob('delete', $index, $ids);
+                $queueService = \Config\Services::queue();
+                if (is_object($queueService) && method_exists($queueService, 'push')) {
+                    $queueService->push($job);
+                    return ['status' => 'queued', 'count' => count($ids)];
+                }
+            } catch (\Throwable) {
+                // Fallback to synchronous delete if queue fails
+            }
+        }
+
+        return $this->driver()->deleteDocuments($index, $ids);
+    }
+
     protected function resolveDriver(string $name): SearchDriverInterface
     {
         $driverConfigs = $this->config->drivers;
