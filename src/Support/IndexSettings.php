@@ -11,6 +11,7 @@ class IndexSettings
      * @param array<string> $filterableAttributes
      * @param array<string> $sortableAttributes
      * @param array<string> $rankingRules
+     * @param array<string, array<string>> $synonyms
      */
     public function __construct(
         public array $searchableAttributes = [],
@@ -19,7 +20,8 @@ class IndexSettings
         public array $rankingRules = [],
         public string $primaryKey = 'id',
         public ?string $name = null,
-        public ?string $distinctField = null
+        public ?string $distinctField = null,
+        public array $synonyms = []
     ) {
     }
 
@@ -46,6 +48,7 @@ class IndexSettings
             'rankingRules'         => $this->rankingRules,
             'primaryKey'           => $this->primaryKey,
             'distinctField'        => $this->distinctField,
+            'synonyms'             => $this->synonyms,
         ];
     }
 }

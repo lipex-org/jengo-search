@@ -133,7 +133,9 @@ trait Searchable
                 filterableAttributes: $instance->filterableAttributes,
                 sortableAttributes: $instance->sortableAttributes,
                 rankingRules: $instance->rankingRules,
-                primaryKey: $instance->primaryKey
+                primaryKey: $instance->primaryKey,
+                distinctField: $instance->distinctField,
+                synonyms: $instance->synonyms
             );
         }
 

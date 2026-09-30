@@ -205,7 +205,9 @@ class SearchQueryBuilder
                     filterableAttributes: $attrInstance->filterableAttributes,
                     sortableAttributes: $attrInstance->sortableAttributes,
                     rankingRules: $attrInstance->rankingRules,
-                    primaryKey: $attrInstance->primaryKey
+                    primaryKey: $attrInstance->primaryKey,
+                    distinctField: $attrInstance->distinctField,
+                    synonyms: $attrInstance->synonyms
                 );
                 return;
             }

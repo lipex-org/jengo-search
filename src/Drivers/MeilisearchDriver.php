@@ -132,6 +132,12 @@ class MeilisearchDriver extends AbstractSearchDriver
         if (!empty($settings->rankingRules)) {
             $payload['rankingRules'] = $settings->rankingRules;
         }
+        if (!empty($settings->distinctField)) {
+            $payload['distinctAttribute'] = $settings->distinctField;
+        }
+        if (!empty($settings->synonyms)) {
+            $payload['synonyms'] = $settings->synonyms;
+        }
 
         if (empty($payload)) {
             return true;

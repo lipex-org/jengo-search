@@ -248,17 +248,30 @@ class TypesenseDriver extends AbstractSearchDriver
         // Check if collection exists
         try {
             $this->request('GET', "{$this->host}/collections/{$qualified}");
-            // Update or patch if already exists
-            return true;
         } catch (Throwable) {
             // Create collection
             try {
                 $this->request('POST', $url, $schema);
-                return true;
             } catch (Throwable $e) {
                 throw new RuntimeException("Typesense collection creation error: " . $e->getMessage(), 0, $e);
             }
         }
+
+        // Sync synonyms if configured
+        if (!empty($settings->synonyms)) {
+            foreach ($settings->synonyms as $synonymId => $synonymsList) {
+                $synonymUrl = "{$this->host}/collections/{$qualified}/synonyms/{$synonymId}";
+                try {
+                    $this->request('PUT', $synonymUrl, [
+                        'synonyms' => array_values((array) $synonymsList),
+                    ]);
+                } catch (Throwable) {
+                    // Ignore individual synonym sync errors
+                }
+            }
+        }
+
+        return true;
     }
 
     public function status(): array
