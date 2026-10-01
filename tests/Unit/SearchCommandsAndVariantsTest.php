@@ -14,6 +14,7 @@ use Jengo\Search\Commands\Variants\SyncSettingsVariant;
 use Jengo\Search\Facades\Search;
 use Jengo\Search\Installers\SearchInstaller;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\Models\DummySearchableModel;
 
 class SearchCommandsAndVariantsTest extends TestCase
 {

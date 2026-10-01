@@ -15,19 +15,7 @@ use Jengo\Search\Testing\SearchFake;
 use Jengo\Search\Traits\Searchable;
 use PHPUnit\Framework\TestCase;
 
-class SearchableModelWithoutAttribute implements SearchableInterface
-{
-    use Searchable;
-
-    public int $id = 42;
-    public string $name = 'Plain Item';
-    public bool $is_active = true;
-
-    public function toArray(): array
-    {
-        return ['id' => $this->id, 'name' => $this->name];
-    }
-}
+use Tests\Support\Models\SearchableModelWithoutAttribute;
 
 class SearchQueryBuilderAndSearchableDeepTest extends TestCase
 {
