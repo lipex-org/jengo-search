@@ -1,8 +1,22 @@
-# Jengo Search
+<p align="center">
+  <a href="https://lipex-org.github.io/jengophp.com/">
+    <img src="https://raw.githubusercontent.com/lipex-org/docs/main/public/logo-full.png" width="220" alt="Jengo Logo">
+  </a>
+</p>
 
-A unified, multi-driver full-text search engine package for CodeIgniter 4 and the Jengo ecosystem. Supports **Meilisearch**, **Typesense**, and **Database (SQL/SQLite)** drivers with an expressive query builder, attribute-driven schema definitions, automatic model lifecycle hooks, and zero external SDK dependencies.
+<h1 align="center">Jengo Search</h1>
 
-Documentation: https://lipex-org.github.io/jengophp.com/packages/search
+<p align="center">
+  <strong>Pluggable full-text search engine for CodeIgniter 4 supporting Meilisearch, Algolia, and Database full-text search drivers.</strong>
+</p>
+
+<p align="center">
+  <a href="https://lipex-org.github.io/jengophp.com/packages/search"><strong>Documentation</strong></a> •
+  <a href="https://github.com/lipex-org/search/blob/main/LICENSE"><strong>License</strong></a> •
+  <a href="https://github.com/lipex-org/search/issues"><strong>Issues</strong></a>
+</p>
+
+---
 
 ---
 
