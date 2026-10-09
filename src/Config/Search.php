@@ -22,7 +22,7 @@ class Search extends BaseConfig
     /**
      * Whether to dispatch indexing operations to background queue.
      */
-    public bool $queue = false;
+    public bool $queue = true;
 
     /**
      * Driver configurations.

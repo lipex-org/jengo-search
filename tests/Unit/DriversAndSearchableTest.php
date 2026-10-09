@@ -68,4 +68,23 @@ class DriversAndSearchableTest extends TestCase
         $model->unsearchable(['a-1']);
         $fake->assertNotIndexed('dummy_articles', 'a-1');
     }
+
+    public function testSearchManagerDispatchWithQueue(): void
+    {
+        $config = new SearchConfig();
+        $config->default = 'null';
+        $config->queue = true;
+
+        $manager = new SearchManager($config);
+        $resUpdate = $manager->dispatchUpdate('posts', [['id' => 1, 'title' => 'Queued Post']]);
+        $this->assertSame(['status' => 'queued', 'count' => 1], $resUpdate);
+
+        $resDelete = $manager->dispatchDelete('posts', [1]);
+        $this->assertSame(['status' => 'queued', 'count' => 1], $resDelete);
+
+        $config->queue = false;
+        $managerSync = new SearchManager($config);
+        $resSync = $managerSync->dispatchUpdate('posts', [['id' => 1]]);
+        $this->assertSame(['status' => 'success', 'count' => 1], $resSync);
+    }
 }

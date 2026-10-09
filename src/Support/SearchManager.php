@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Jengo\Search\Support;
 
-use Config\Services;
 use InvalidArgumentException;
+use Jengo\Base\Container\Traits\HasContainer;
+use Jengo\Queues\Facades\Queue;
 use Jengo\Search\Config\Search as SearchConfig;
 use Jengo\Search\Contracts\SearchDriverInterface;
 use Jengo\Search\Drivers\DatabaseDriver;
@@ -17,6 +18,8 @@ use Jengo\Search\Testing\SearchFake;
 
 class SearchManager
 {
+    use HasContainer;
+
     protected SearchConfig $config;
     protected array $drivers = [];
     protected ?SearchFake $fake = null;
@@ -69,7 +72,7 @@ class SearchManager
 
     public function extend(string $name, callable $callback): self
     {
-        $this->drivers[$name] = $callback($this->config);
+        $this->drivers[$name] = $this->call($callback, ['config' => $this->config]);
         return $this;
     }
 
@@ -85,17 +88,16 @@ class SearchManager
 
     public function dispatchUpdate(string $index, array $documents, string $primaryKey = 'id'): array
     {
-        if ($this->shouldQueue() && class_exists('Config\Services') && is_callable(['Config\Services', 'queue'])) {
-            try {
-                $job = new \Jengo\Search\Jobs\SyncSearchIndexJob('update', $index, $documents, $primaryKey);
-                $queueService = \Config\Services::queue();
-                if (is_object($queueService) && method_exists($queueService, 'push')) {
-                    $queueService->push($job);
-                    return ['status' => 'queued', 'count' => count($documents)];
-                }
-            } catch (\Throwable) {
-                // Fallback to synchronous update if queue fails
-            }
+        if ($this->fake !== null) {
+            return $this->fake->updateDocuments($index, $documents, $primaryKey);
+        }
+
+        if ($this->shouldQueue()) {
+            Queue::defer(function () use ($index, $documents, $primaryKey) {
+                $this->driver()->updateDocuments($index, $documents, $primaryKey);
+            });
+
+            return ['status' => 'queued', 'count' => count($documents)];
         }
 
         return $this->driver()->updateDocuments($index, $documents, $primaryKey);
@@ -103,17 +105,16 @@ class SearchManager
 
     public function dispatchDelete(string $index, array $ids): array
     {
-        if ($this->shouldQueue() && class_exists('Config\Services') && is_callable(['Config\Services', 'queue'])) {
-            try {
-                $job = new \Jengo\Search\Jobs\SyncSearchIndexJob('delete', $index, $ids);
-                $queueService = \Config\Services::queue();
-                if (is_object($queueService) && method_exists($queueService, 'push')) {
-                    $queueService->push($job);
-                    return ['status' => 'queued', 'count' => count($ids)];
-                }
-            } catch (\Throwable) {
-                // Fallback to synchronous delete if queue fails
-            }
+        if ($this->fake !== null) {
+            return $this->fake->deleteDocuments($index, $ids);
+        }
+
+        if ($this->shouldQueue()) {
+            Queue::defer(function () use ($index, $ids) {
+                $this->driver()->deleteDocuments($index, $ids);
+            });
+
+            return ['status' => 'queued', 'count' => count($ids)];
         }
 
         return $this->driver()->deleteDocuments($index, $ids);
